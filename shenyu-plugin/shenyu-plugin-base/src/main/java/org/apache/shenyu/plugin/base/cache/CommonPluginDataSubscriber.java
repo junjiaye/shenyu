@@ -18,12 +18,19 @@
 package org.apache.shenyu.plugin.base.cache;
 
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.shenyu.common.config.ShenyuConfig.ShenyuTrieConfig;
 import org.apache.shenyu.common.dto.PluginData;
 import org.apache.shenyu.common.dto.RuleData;
 import org.apache.shenyu.common.dto.SelectorData;
 import org.apache.shenyu.common.enums.DataEventTypeEnum;
 import org.apache.shenyu.common.enums.PluginHandlerEventEnum;
+import org.apache.shenyu.common.enums.TrieCacheTypeEnum;
+import org.apache.shenyu.common.enums.TrieEventEnum;
+import org.apache.shenyu.common.utils.MapUtils;
+import org.apache.shenyu.plugin.api.utils.SpringBeanUtils;
+import org.apache.shenyu.plugin.base.event.TrieEvent;
 import org.apache.shenyu.plugin.base.handler.PluginDataHandler;
+import org.apache.shenyu.plugin.base.trie.ShenyuTrie;
 import org.apache.shenyu.sync.data.api.PluginDataSubscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,28 +53,42 @@ public class CommonPluginDataSubscriber implements PluginDataSubscriber {
     private final Map<String, PluginDataHandler> handlerMap;
 
     private ApplicationEventPublisher eventPublisher;
-
+    
+    private final ShenyuTrieConfig selectorTrieConfig;
+    
+    private final ShenyuTrieConfig ruleTrieConfig;
+    
     /**
      * Instantiates a new Common plugin data subscriber.
      *
      * @param pluginDataHandlerList the plugin data handler list
+     * @param selectorTrieConfig    shenyu selector trie config
+     * @param ruleTrieConfig        shenyu selector trie config
      */
-    public CommonPluginDataSubscriber(final List<PluginDataHandler> pluginDataHandlerList) {
+    public CommonPluginDataSubscriber(final List<PluginDataHandler> pluginDataHandlerList, final ShenyuTrieConfig selectorTrieConfig, final ShenyuTrieConfig ruleTrieConfig) {
         this.handlerMap = pluginDataHandlerList.stream().collect(Collectors.toConcurrentMap(PluginDataHandler::pluginNamed, e -> e));
+        this.selectorTrieConfig = selectorTrieConfig;
+        this.ruleTrieConfig = ruleTrieConfig;
     }
-
+    
     /**
      * Instantiates a new Common plugin data subscriber.
      *
      * @param pluginDataHandlerList the plugin data handler list
      * @param eventPublisher        eventPublisher is used to publish sort plugin event
+     * @param selectorTrieConfig    shenyu trie config
+     * @param ruleTrieConfig        shenyu trie config
      */
     public CommonPluginDataSubscriber(final List<PluginDataHandler> pluginDataHandlerList,
-                                      final ApplicationEventPublisher eventPublisher) {
+                                      final ApplicationEventPublisher eventPublisher,
+                                      final ShenyuTrieConfig selectorTrieConfig,
+                                      final ShenyuTrieConfig ruleTrieConfig) {
         this.handlerMap = pluginDataHandlerList.stream().collect(Collectors.toConcurrentMap(PluginDataHandler::pluginNamed, e -> e));
         this.eventPublisher = eventPublisher;
+        this.selectorTrieConfig = selectorTrieConfig;
+        this.ruleTrieConfig = ruleTrieConfig;
     }
-
+    
     /**
      * Put extend plugin data handler.
      *
@@ -79,7 +100,7 @@ public class CommonPluginDataSubscriber implements PluginDataSubscriber {
         }
         for (PluginDataHandler handler : handlers) {
             String pluginNamed = handler.pluginNamed();
-            handlerMap.computeIfAbsent(pluginNamed, name -> {
+            MapUtils.computeIfAbsent(handlerMap, pluginNamed, name -> {
                 LOG.info("shenyu auto add extends plugin data handler name is :{}", pluginNamed);
                 return handler;
             });
@@ -146,6 +167,11 @@ public class CommonPluginDataSubscriber implements PluginDataSubscriber {
     @Override
     public void refreshRuleDataAll() {
         BaseDataCache.getInstance().cleanRuleData();
+        MatchDataCache.getInstance().cleanRuleDataData();
+        ShenyuTrie ruleTrie = SpringBeanUtils.getInstance().getBean(TrieCacheTypeEnum.RULE.getTrieType());
+        ShenyuTrie selectorTrie = SpringBeanUtils.getInstance().getBean(TrieCacheTypeEnum.SELECTOR.getTrieType());
+        ruleTrie.clear();
+        selectorTrie.clear();
     }
     
     @Override
@@ -193,13 +219,38 @@ public class CommonPluginDataSubscriber implements PluginDataSubscriber {
             MatchDataCache.getInstance().removeSelectorData(selectorData.getPluginName());
             Optional.ofNullable(handlerMap.get(selectorData.getPluginName()))
                     .ifPresent(handler -> handler.handlerSelector(selectorData));
-            
+            if (!selectorTrieConfig.getEnabled()) {
+                return;
+            }
+            if (Boolean.TRUE.equals(selectorData.getEnabled())) {
+                if (CollectionUtils.isEmpty(selectorData.getBeforeConditionList())) {
+                    eventPublisher.publishEvent(new TrieEvent(TrieEventEnum.INSERT, TrieCacheTypeEnum.SELECTOR, selectorData));
+                } else {
+                    // if selector data has before condition, update trie
+                    eventPublisher.publishEvent(new TrieEvent(TrieEventEnum.UPDATE, TrieCacheTypeEnum.SELECTOR, selectorData));
+                }
+            } else {
+                eventPublisher.publishEvent(new TrieEvent(TrieEventEnum.REMOVE, TrieCacheTypeEnum.SELECTOR, selectorData));
+            }
         } else if (data instanceof RuleData) {
             RuleData ruleData = (RuleData) data;
             BaseDataCache.getInstance().cacheRuleData(ruleData);
             Optional.ofNullable(handlerMap.get(ruleData.getPluginName()))
                     .ifPresent(handler -> handler.handlerRule(ruleData));
-            
+            MatchDataCache.getInstance().removeRuleData(ruleData.getPluginName());
+            if (!ruleTrieConfig.getEnabled()) {
+                return;
+            }
+            if (Boolean.TRUE.equals(ruleData.getEnabled())) {
+                if (CollectionUtils.isEmpty(ruleData.getBeforeConditionDataList())) {
+                    eventPublisher.publishEvent(new TrieEvent(TrieEventEnum.INSERT, TrieCacheTypeEnum.RULE, ruleData));
+                } else {
+                    // if rule data has before condition, update trie
+                    eventPublisher.publishEvent(new TrieEvent(TrieEventEnum.UPDATE, TrieCacheTypeEnum.RULE, ruleData));
+                }
+            } else {
+                eventPublisher.publishEvent(new TrieEvent(TrieEventEnum.REMOVE, TrieCacheTypeEnum.RULE, ruleData));
+            }
         }
     }
 
@@ -238,13 +289,20 @@ public class CommonPluginDataSubscriber implements PluginDataSubscriber {
             MatchDataCache.getInstance().removeSelectorData(selectorData.getPluginName());
             Optional.ofNullable(handlerMap.get(selectorData.getPluginName()))
                     .ifPresent(handler -> handler.removeSelector(selectorData));
-            
+            if (!selectorTrieConfig.getEnabled()) {
+                return;
+            }
+            eventPublisher.publishEvent(new TrieEvent(TrieEventEnum.REMOVE, TrieCacheTypeEnum.SELECTOR, selectorData));
         } else if (data instanceof RuleData) {
             RuleData ruleData = (RuleData) data;
             BaseDataCache.getInstance().removeRuleData(ruleData);
             Optional.ofNullable(handlerMap.get(ruleData.getPluginName()))
                     .ifPresent(handler -> handler.removeRule(ruleData));
-            
+            MatchDataCache.getInstance().removeRuleData(ruleData.getPluginName());
+            if (!ruleTrieConfig.getEnabled()) {
+                return;
+            }
+            eventPublisher.publishEvent(new TrieEvent(TrieEventEnum.REMOVE, TrieCacheTypeEnum.RULE, ruleData));
         }
     }
 }

@@ -21,10 +21,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Table view.
+ */
 public class TableView {
+
     private List<String[]> table = new ArrayList<>();
     
     private final int sizeOfColumnsInRow;
+
     private final String[] headers;
     
     private int[] maxContentLengthOfColumns;
@@ -56,7 +61,10 @@ public class TableView {
         StringBuilder separator = new StringBuilder("+");
         for (int i = 0; i < maxContentLengthOfColumns.length; i++) {
             int length = maxContentLengthOfColumns[i];
-            separator.append("-".repeat(length + 2)).append("+");
+            for (int j = -2; j < length; j++) {
+                separator.append('-');
+            }
+            separator.append("+");
             template[i] = String.format(" %%-%ds ", length);
         }
         separator.append(System.lineSeparator());

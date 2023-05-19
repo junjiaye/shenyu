@@ -21,7 +21,7 @@ import org.apache.shenyu.client.core.exception.ShenyuClientIllegalArgumentExcept
 import org.apache.shenyu.client.core.register.ShenyuClientRegisterRepositoryFactory;
 import org.apache.shenyu.client.springmvc.annotation.ShenyuSpringMvcClient;
 import org.apache.shenyu.common.exception.ShenyuException;
-import org.apache.shenyu.common.utils.PortUtils;
+import org.apache.shenyu.client.core.utils.PortUtils;
 import org.apache.shenyu.register.client.api.ShenyuClientRegisterRepository;
 import org.apache.shenyu.register.client.http.utils.RegisterUtils;
 import org.apache.shenyu.register.common.config.PropertiesConfig;
@@ -109,7 +109,7 @@ public class SpringMvcClientEventListenerTest {
         registerUtilsMockedStatic.when(() -> RegisterUtils.doLogin(any(), any(), any())).thenReturn(Optional.of("token"));
         SpringMvcClientEventListener springMvcClientEventListener = buildSpringMvcClientEventListener(false, true);
         springMvcClientEventListener.onApplicationEvent(contextRefreshedEvent);
-        verify(applicationContext, times(1)).getBeansWithAnnotation(any());
+        verify(applicationContext, times(2)).getBeansWithAnnotation(any());
         registerUtilsMockedStatic.close();
     }
 
@@ -121,7 +121,7 @@ public class SpringMvcClientEventListenerTest {
                 .thenAnswer((Answer<Void>) invocation -> null);
         SpringMvcClientEventListener springMvcClientEventListener = buildSpringMvcClientEventListener(false, true);
         springMvcClientEventListener.onApplicationEvent(contextRefreshedEvent);
-        verify(applicationContext, times(1)).getBeansWithAnnotation(any());
+        verify(applicationContext, times(2)).getBeansWithAnnotation(any());
         registerUtilsMockedStatic.close();
     }
 
@@ -156,6 +156,7 @@ public class SpringMvcClientEventListenerTest {
         // hit `!registered.compareAndSet(false, true)`
         springMvcClientEventListener.onApplicationEvent(contextRefreshedEvent);
         portUtilsMockedStatic.close();
+        registerUtilsMockedStatic.close();
     }
     
     @Test

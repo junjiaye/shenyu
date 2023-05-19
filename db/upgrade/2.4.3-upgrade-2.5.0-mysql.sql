@@ -45,7 +45,7 @@ INSERT IGNORE INTO shenyu_dict (`id`, `type`, `dict_code`, `dict_name`, `dict_va
 INSERT IGNORE INTO shenyu_dict (`id`, `type`, `dict_code`, `dict_name`, `dict_value`, `desc`, `sort`, `enabled`) VALUES ('1529402613195784248', 'signRequestBody', 'SIGN_REQUEST_BODY', 'open', 'true', 'open', 0, 1);
 
 -- refactor logging name
-UPDATE plugin SET name = 'LoggingConsole' WHERE name = 'logging';
+UPDATE plugin SET name = 'loggingConsole' WHERE name = 'logging';
 
 -- new table operation_record_log
 -- ----------------------------
@@ -127,8 +127,8 @@ INSERT INTO `plugin_handle` VALUES ('1529402613204172890', '33', 'compressAlg', 
 INSERT INTO `plugin_handle` VALUES ('1529402613204172884', '1', 'signRequestBody', 'signRequestBody', 3, 2, 9, '{"required":"0","defaultValue":"false","placeholder":"signRequestBody","rule":""}', '2022-06-29 10:08:02', '2022-06-29 10:08:02');
 
 -- use shared thread pool as default
-UPDATE plugin SET config='{"multiSelectorHandle":"1","multiRuleHandle":"0","threadpool":"shared"}' WHERE "name" = 'grpc';
-UPDATE plugin SET config='{"multiSelectorHandle":"1","multiRuleHandle":"0","threadpool":"shared"}' WHERE "name" = 'tars';
+UPDATE plugin SET config='{"multiSelectorHandle":"1","multiRuleHandle":"0","threadpool":"shared"}' WHERE `name` = 'grpc';
+UPDATE plugin SET config='{"multiSelectorHandle":"1","multiRuleHandle":"0","threadpool":"shared"}' WHERE `name` = 'tars';
 -- Note: because most users have changed ZK configuration, the following SQLs are annotated to prevent erroneous execution
 -- UPDATE plugin SET config='{"register":"127.0.0.1:2181","threadpool":"shared"}' WHERE "name" = 'motan';
 -- UPDATE plugin SET config='{"protocol":"zookeeper","register":"127.0.0.1:2181","threadpool":"shared"}' WHERE "name" = 'sofa';

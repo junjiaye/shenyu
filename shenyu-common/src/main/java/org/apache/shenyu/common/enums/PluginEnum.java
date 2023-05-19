@@ -26,17 +26,20 @@ import java.util.stream.Collectors;
  * PluginEnum.
  */
 public enum PluginEnum {
-    
+
+    /**
+     * Global plugin enum.
+     */
+    GLOBAL(-1, 0, "global"),
+    /**
+     * Tcp plugin enum.
+     */
+    TCP(0, 0, "tcp"),
     /**
      * Mqtt plugin enum.
      */
     MQTT(0, 0, "mqtt"),
-    
-    /**
-     * Global plugin enum.
-     */
-    GLOBAL(5, 0, "global"),
-    
+
     /**
      * the mock plugin enum.
      */
@@ -111,6 +114,8 @@ public enum PluginEnum {
      * Request plugin enum.
      */
     REQUEST(120, 0, "request"),
+
+
     
     /**
      * GeneralContext plugin enum.
@@ -238,6 +243,11 @@ public enum PluginEnum {
     MOTAN(310, 0, "motan"),
 
     /**
+     * Motan plugin enum.
+     */
+    BRPC(310, 0, "brpc"),
+
+    /**
      * Cryptor response plugin enum.
      */
     CRYPTOR_RESPONSE(410, 0, "cryptorResponse"),
@@ -245,7 +255,12 @@ public enum PluginEnum {
     /**
      * Response plugin enum.
      */
-    RESPONSE(420, 0, "response");
+    RESPONSE(420, 0, "response"),
+
+    /**
+     * Key-auth plugin enum.
+     */
+    KEY_AUTH(430, 0, "keyAuth");
     
     /**
      * When the application starts, the plugin is cached and we can obtained by name.

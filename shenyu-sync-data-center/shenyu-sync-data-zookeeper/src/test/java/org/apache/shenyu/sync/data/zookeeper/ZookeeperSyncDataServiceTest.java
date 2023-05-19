@@ -24,12 +24,13 @@ import org.apache.curator.framework.recipes.cache.TreeCacheListener;
 import org.apache.shenyu.sync.data.api.AuthDataSubscriber;
 import org.apache.shenyu.sync.data.api.MetaDataSubscriber;
 import org.apache.shenyu.sync.data.api.PluginDataSubscriber;
+import org.apache.shenyu.sync.data.api.ProxySelectorDataSubscriber;
 import org.junit.jupiter.api.Test;
-import org.springframework.util.ObjectUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -51,8 +52,9 @@ public final class ZookeeperSyncDataServiceTest {
         }).when(zkClient).addCache(any(), any());
         final AuthDataSubscriber authDataSubscriber = mock(AuthDataSubscriber.class);
         final MetaDataSubscriber metaDataSubscriber = mock(MetaDataSubscriber.class);
+        final ProxySelectorDataSubscriber proxySelectorDataSubscriber = mock(ProxySelectorDataSubscriber.class);
         final ZookeeperSyncDataService zookeeperSyncDataService = new ZookeeperSyncDataService(zkClient,
-                pluginDataSubscriber, Collections.singletonList(metaDataSubscriber), Collections.singletonList(authDataSubscriber));
+                pluginDataSubscriber, Collections.singletonList(metaDataSubscriber), Collections.singletonList(authDataSubscriber), Collections.singletonList(proxySelectorDataSubscriber));
 
         List<TreeCacheEvent> treeCacheEvents = new ArrayList<>();
         // register uri
@@ -75,7 +77,7 @@ public final class ZookeeperSyncDataServiceTest {
             }
         }
         final TreeCacheListener treeCacheListener = treeCacheListeners.stream().findFirst().orElse(null);
-        if (!ObjectUtils.isEmpty(treeCacheListener)) {
+        if (Objects.nonNull(treeCacheListener)) {
             TreeCacheEvent event = mock(TreeCacheEvent.class);
             ChildData childData = mock(ChildData.class);
             treeCacheListener.childEvent(curatorFramework, event);

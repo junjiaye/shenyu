@@ -27,7 +27,7 @@ import org.apache.shenyu.admin.model.result.ShenyuAdminResult;
 import org.apache.shenyu.admin.model.vo.SelectorVO;
 import org.apache.shenyu.admin.service.PageService;
 import org.apache.shenyu.admin.service.SelectorService;
-import org.apache.shenyu.admin.utils.ListUtil;
+import org.apache.shenyu.common.utils.ListUtil;
 import org.apache.shenyu.admin.utils.SessionUtil;
 import org.apache.shenyu.admin.utils.ShenyuResultMessage;
 import org.apache.shenyu.admin.validation.annotation.Existed;
@@ -77,7 +77,7 @@ public class SelectorController implements PagedController<SelectorQueryConditio
                                                                 @RequestParam @NotNull final Integer pageSize) {
         final SelectorQueryCondition condition = new SelectorQueryCondition();
         condition.setUserId(SessionUtil.visitor().getUserId());
-        condition.setPlugin(ListUtil.list(pluginId));
+        condition.setPlugin(ListUtil.of(pluginId));
         condition.setKeyword(name);
         return searchAdaptor(new PageCondition<>(currentPage, pageSize, condition));
     }

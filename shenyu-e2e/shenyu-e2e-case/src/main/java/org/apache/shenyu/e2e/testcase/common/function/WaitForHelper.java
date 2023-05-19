@@ -22,13 +22,13 @@ import io.restassured.http.Method;
 import io.restassured.response.ValidatableResponse;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,10 +38,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
-@Slf4j
-@NoArgsConstructor
-@AllArgsConstructor
+/**
+ * Wait for checking endpoint.
+ */
 public class WaitForHelper {
+
+    private static final Logger log = LoggerFactory.getLogger(WaitForHelper.class);
+
     private static final ExecutorService executor = MoreExecutors.getExitingExecutorService((ThreadPoolExecutor) Executors.newFixedThreadPool(1));
     
     public int retryTimes = 30;
@@ -49,9 +52,30 @@ public class WaitForHelper {
     public Duration timeInRetry = Duration.ofSeconds(3);
     
     public Duration timeout = Duration.ofMinutes(3);
-    
+
+    public WaitForHelper() {
+    }
+
+    public WaitForHelper(int retryTimes, Duration timeInRetry, Duration timeout) {
+        this.retryTimes = retryTimes;
+        this.timeInRetry = timeInRetry;
+        this.timeout = timeout;
+    }
+
+    /**
+     * Check if the endpoint is successful. If unsuccessful, retry until the maximum number of times is reached.
+     *
+     * @param supplier supplier
+     * @param method method
+     * @param endpoint endpoint
+     * @param expected expected
+     * @throws TimeoutException TimeoutException
+     */
     public void waitFor(Supplier<RequestSpecification> supplier, Method method, String endpoint, ResponseSpecification expected) throws TimeoutException {
+        final Map<String, String> contextMap = MDC.getCopyOfContextMap();
         Future<?> future = executor.submit(() -> {
+            MDC.setContextMap(contextMap);
+            
             for (int i = 0; i < retryTimes; i++) {
                 try {
                     ValidatableResponse response = supplier.get()
@@ -83,10 +107,19 @@ public class WaitForHelper {
             throw new TimeoutException("checking endpoint '" + endpoint + "' timeout after " + timeout);
         }
     }
-    
-    
+
+    /**
+     * Check if the endpoint is successful. If unsuccessful, retry until the maximum number of times is reached.
+     *
+     * @param supplier supplier
+     * @param checker checker
+     * @throws TimeoutException TimeoutException
+     */
     public void waitFor(Supplier<RequestSpecification> supplier, HttpChecker checker) throws TimeoutException {
+        final Map<String, String> contextMap = MDC.getCopyOfContextMap();
         Future<?> future = executor.submit(() -> {
+            MDC.setContextMap(contextMap);
+            
             for (int i = 0; i < retryTimes; i++) {
                 try {
                     checker.check(supplier);

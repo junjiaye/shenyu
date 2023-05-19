@@ -22,22 +22,26 @@ import com.weibo.api.motan.config.springsupport.annotation.MotanService;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.shenyu.client.core.client.AbstractContextRefreshedEventListener;
+import org.apache.shenyu.client.core.constant.ShenyuClientConstants;
 import org.apache.shenyu.client.core.disruptor.ShenyuClientRegisterEventPublisher;
 import org.apache.shenyu.client.core.exception.ShenyuClientIllegalArgumentException;
 import org.apache.shenyu.client.motan.common.annotation.ShenyuMotanClient;
 import org.apache.shenyu.client.motan.common.dto.MotanRpcExt;
+import org.apache.shenyu.common.enums.ApiHttpMethodEnum;
 import org.apache.shenyu.common.enums.RpcTypeEnum;
 import org.apache.shenyu.common.utils.GsonUtils;
-import org.apache.shenyu.common.utils.IpUtils;
 import org.apache.shenyu.register.client.api.ShenyuClientRegisterRepository;
 import org.apache.shenyu.register.common.config.PropertiesConfig;
 import org.apache.shenyu.register.common.dto.MetaDataRegisterDTO;
 import org.apache.shenyu.register.common.dto.URIRegisterDTO;
+import org.javatuples.Sextet;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.LocalVariableTableParameterNameDiscoverer;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.lang.Nullable;
 import org.springframework.util.ReflectionUtils;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -65,6 +69,20 @@ public class MotanServiceEventListener extends AbstractContextRefreshedEventList
     public MotanServiceEventListener(final PropertiesConfig clientConfig,
                                      final ShenyuClientRegisterRepository shenyuClientRegisterRepository) {
         super(clientConfig, shenyuClientRegisterRepository);
+    }
+
+    @Override
+    protected Sextet<String[], String, String, ApiHttpMethodEnum[], RpcTypeEnum, String> buildApiDocSextet(final Method method, final Annotation annotation, final Map<String, Object> beans) {
+        ShenyuMotanClient shenyuMotanClient = AnnotatedElementUtils.findMergedAnnotation(method, ShenyuMotanClient.class);
+        if (Objects.isNull(shenyuMotanClient)) {
+            return null;
+        }
+        String produce = ShenyuClientConstants.MEDIA_TYPE_ALL_VALUE;
+        String consume = ShenyuClientConstants.MEDIA_TYPE_ALL_VALUE;
+        String[] values = new String[]{shenyuMotanClient.value()};
+        ApiHttpMethodEnum[] apiHttpMethodEnums = new ApiHttpMethodEnum[]{ApiHttpMethodEnum.NOT_HTTP};
+        String version = "v0.01";
+        return Sextet.with(values, consume, produce, apiHttpMethodEnums, RpcTypeEnum.MOTAN, version);
     }
 
     @Override
@@ -99,13 +117,14 @@ public class MotanServiceEventListener extends AbstractContextRefreshedEventList
     }
 
     @Override
-    protected MetaDataRegisterDTO buildMetaDataDTO(final Object bean, final ShenyuMotanClient shenyuMotanClient, final String superPath, final Class<?> clazz, final Method method) {
+    protected MetaDataRegisterDTO buildMetaDataDTO(final Object bean,
+                                                   final ShenyuMotanClient shenyuMotanClient,
+                                                   final String path,
+                                                   final Class<?> clazz,
+                                                   final Method method) {
         Integer timeout = Optional.ofNullable(((BasicServiceConfigBean) applicationContext.getBean(BASE_SERVICE_CONFIG)).getRequestTimeout()).orElse(1000);
         MotanService service = AnnotatedElementUtils.findMergedAnnotation(clazz, MotanService.class);
-        String path = superPath.contains("*") ? pathJoin(getContextPath(), superPath.replace("*", ""), method.getName()) : pathJoin(getContextPath(), superPath, shenyuMotanClient.path());
         String desc = shenyuMotanClient.desc();
-        String host = IpUtils.isCompleteHost(this.getHost()) ? this.getHost() : IpUtils.getHost(this.getHost());
-        int port = StringUtils.isBlank(this.getPort()) ? -1 : Integer.parseInt(this.getPort());
         String configRuleName = shenyuMotanClient.ruleName();
         String ruleName = ("".equals(configRuleName)) ? path : configRuleName;
         String methodName = method.getName();
@@ -129,8 +148,8 @@ public class MotanServiceEventListener extends AbstractContextRefreshedEventList
                 .methodName(methodName)
                 .contextPath(this.getContextPath())
                 .path(path)
-                .port(port)
-                .host(host)
+                .port(Integer.parseInt(super.getPort()))
+                .host(super.getHost())
                 .ruleName(ruleName)
                 .pathDesc(desc)
                 .parameterTypes(parameterTypes)
@@ -141,17 +160,22 @@ public class MotanServiceEventListener extends AbstractContextRefreshedEventList
     }
 
     @Override
-    protected String buildApiPath(final Method method, final String superPath, final ShenyuMotanClient methodShenyuClient) {
+    protected String buildApiPath(final Method method,
+                                  final String superPath,
+                                  @Nullable final ShenyuMotanClient methodShenyuClient) {
         return superPath.contains("*")
                 ? pathJoin(this.getContextPath(), superPath.replace("*", ""), method.getName())
-                : pathJoin(this.getContextPath(), superPath, methodShenyuClient.path());
+                : pathJoin(this.getContextPath(), superPath, Objects.requireNonNull(methodShenyuClient).path());
     }
 
     @Override
     protected void handleClass(final Class<?> clazz, final Object bean, final ShenyuMotanClient beanShenyuClient, final String superPath) {
         Method[] methods = ReflectionUtils.getDeclaredMethods(clazz);
         for (Method method : methods) {
-            publisher.publishEvent(buildMetaDataDTO(bean, beanShenyuClient, superPath, clazz, method));
+            final MetaDataRegisterDTO metaData = buildMetaDataDTO(bean, beanShenyuClient,
+                    buildApiPath(method, superPath, null), clazz, method);
+            publisher.publishEvent(metaData);
+            getMetaDataMap().put(method, metaData);
         }
     }
 
